@@ -1,0 +1,63 @@
+classdef MultiNormal < Distribution
+    %NORMAL Class to compute quantities related to normal distribution
+    
+    properties
+    end
+    
+    methods (Static)
+        
+        %% Random number generator
+        % input:  
+        %        params = {mu (colum) , var(squared matrix)}
+        % output:
+        %        Dx1 vector of random numbers
+        function random_num = rngFnc(params,varargin)
+            random_num = mvnrnd(params{1},params{2});
+        end
+        
+        %% Log pdf function
+        % input: 
+        %        x: Dx1 
+        %        params = [mean(column),variance(squared matrix)]
+        % output:
+        %        log of pdf function(scalar)
+        function log_pdf = logPdfFnc(x,params)
+            mu = params{1};
+            Sigma = params{2};
+            d = length(x);            
+            log_pdf = -d/2*log(2*pi)-1/2*log(det(Sigma))-1/2*(x-mu)'*(Sigma\(x-mu));
+        end
+
+        %% Gradient of log pdf function
+        % input: 
+        %        x: Dx1 
+        %        params = [mean(scalar),variance(scalar)]
+        % output:
+        %        gradient of log pdf function: Dx1
+        function grad_log_pdf = GradlogPdfFnc(x,params)
+            mu = params(1);
+            sigma2 = params(2);
+            grad_log_pdf = -(x-mu)/sigma2;
+        end
+
+        %% Log jacobian
+        % input: 
+        %        x: Dx1 
+        %        params = [mean(scalar),variance(scalar)]
+        % output:
+        %        log Jacobian of transformation (scalar)
+        function log_jac = logJacFnc(x,params)
+        end
+        
+        %% Gradient of log jacobian
+        % input: 
+        %        x: Dx1 
+        %        params = [mean(scalar),variance(scalar)]
+        % output:
+        %        gradient of log Jacobian of transformation: Dx1 
+        function grad_log_jac = GradlogJacFnc(x,params)
+        end
+        
+    end
+end
+
