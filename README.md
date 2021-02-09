@@ -1,3 +1,5 @@
 # VBLab
 
-The package will be available on 15 Feb 2021
+The current files are only for testing.
+
+The package will be available on 15 Feb 2021.
