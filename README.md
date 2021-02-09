@@ -1,4 +1,4 @@
-# VBLab
+# VBLab package for Bayesian Inference
 
 The current files are only for testing.
 
