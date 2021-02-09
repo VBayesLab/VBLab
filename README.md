@@ -1,4 +1,4 @@
-# VBLab package for Variational Bayes and Bayesian Inference
+# VBLab: a package for Variational Bayes and Bayesian Inference
 
 The current files are only for testing.
 
