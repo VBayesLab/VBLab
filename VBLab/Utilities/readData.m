@@ -1,4 +1,4 @@
-function data = read_data(dataName, varargin)
+function data = readData(dataName, varargin)
 
 % Initialize additional options
 Intercept = true;  
