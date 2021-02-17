@@ -1,4 +1,4 @@
-# VBLab: a package for Variational Inference
+# VBLab: a Matlab package for Variational Inference
 
 The current files are only for testing.
 
