@@ -1,5 +1,9 @@
 # VBLab: a Matlab package for Variational Inference
 
+## Documentation
+
+The official documentation is avaiable at https://vbayeslab.github.io/VBLabDocs/
+
 ## Getting started
 
 ### Install VBLab package
