@@ -1,5 +1,5 @@
-% Script to run the Example 3.4 using a built-in Logistic Regression class of
-% the VBLab package
+% Script to fit a Logistic Regression model, defined as a function handle,
+% using the NAGVAC method
 
 clear  % Clear all variables 
 clc % Clean workspace
@@ -8,35 +8,31 @@ clc % Clean workspace
 rng(2020)
 
 % Load the LabourForce dataset
-labour = readData('LabourForce',...     % Dataset name
+credit = readData('LabourForce',...     % Dataset name
                   'Type','Matrix',...   % Store data as a 2D array (default)
                   'Intercept', true);   % Add column of intercept (default)
 
 % Compute number of features
-n_features = size(labour,2)-1;
+n_features = size(credit,2)-1;
 
 % Additional Setting
-setting.Prior = [0,50];
+setting.Prior = [0,1];
 
-% Initialize using MLE estimate (for quickly converging)
-X = labour(:,1:end-1);
-y = labour(:,end);
-theta_init = glmfit(X,y,'binomial','constant','off'); % initialise mu
+% Initialize using MLE estimate
+X = credit(:,1:end-1);
+y = credit(:,end);
 
 % Run CGVB
-Post_CGVB_manual = CGVB(@grad_h_func_logistic,labour,...
-                        'NumParams',n_features,...
-                        'Setting',setting,...
-                        'LearningRate',0.002,...   % Learning rate
-                        'NumSample',50,...         % Number of samples to estimate gradient of lowerbound
-                        'MaxPatience',20,...       % For Early stopping
-                        'MaxIter',5000,...         % Maximum number of iterations
-                        'MeanInit',theta_init ,... % Randomly initialize parameters using 
-                        'GradWeight1',0.9,...      % Momentum 1
-                        'GradWeight2',0.9,...      % Momentum 2
-                        'WindowSize',10,...        % Smoothing window for lowerbound
-                        'GradientMax',10,...       % For gradient clipping
-                        'LBPlot',true); 
+Post_CGVB_manual = NAGVAC(@grad_h_func_logistic,credit,...
+                          'NumParams',n_features,...
+                          'Setting',setting,...
+                          'NumSample',100,...       % Number of samples to estimate gradient of lowerbound
+                          'LearningRate',0.01,...   % Learning rate
+                          'MaxPatience',20,...      % For Early stopping
+                          'MaxIter',10000,...       % Maximum number of iterations
+                          'GradientMax',200,...     % For gradient clipping    
+                          'WindowSize',30, ...      % Smoothing window for lowerbound
+                          'LBPlot',true);           % Dont plot the lowerbound when finish
 
 %% Define gradient of h function for Logistic regression 
 % theta: Dx1 array

@@ -38,7 +38,7 @@ rng(2020)
 
 theta_init = Mdl.initParams('MLE',labour); 
 Estmdl_2  = CGVB(Mdl,labour,...
-                'MeanInit',theta_init,... % 
+                'MeanInit',theta_init,... % Initial values of variational mean
 			    'LearningRate',0.002,...  % Learning rate
 			    'NumSample',50,...        % Number of samples to estimate gradient of lowerbound
 			    'MaxPatience',20,...      % For Early stopping
