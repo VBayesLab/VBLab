@@ -4,7 +4,7 @@ classdef ModelClass
     
     properties
         ModelName
-        ParamNum
+        NumParam
     end
     
     methods

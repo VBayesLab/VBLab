@@ -8,7 +8,7 @@ classdef VAFC < VBayesLab
     end
     
     methods
-        function obj = VAFC(data,varargin)
+        function obj = VAFC(mdl,data,varargin)
             %CGVB Construct an instance of this class
             %   Detailed explanation goes here
             obj.Method       = 'VAFC';
@@ -19,64 +19,41 @@ classdef VAFC < VBayesLab
             obj.SigInitScale = 0.01;
             
             % Parse additional options
-            if nargin > 1
+            if nargin > 2
                 %Parse additional options
                 paramNames = {'NumSample'             'LearningRate'       'GradWeight'      ...      
                               'MaxIter'               'MaxPatience'        'WindowSize'      'Verbose' ...        
                               'InitMethod'            'StdForInit'         'Seed'            'MeanInit' ...       
                               'SigInitScale'          'LBPlot'             'GradientMax'     'AutoDiff' ...       
-                              'HFuntion'              'GradHFuntion'       'ParamsDim'       'Model' ...
-                              'DataTrain'             'Setting'            'StepAdaptive'    'NumFactor',...
-                              'SaveParams'            'Optimization'};
+                              'HFuntion'              'NumParams'          'DataTrain'       'Setting' ...
+                              'StepAdaptive'          'NumFactor'          'SaveParams'      'Optimization'};
                 paramDflts = {obj.NumSample            obj.LearningRate    obj.GradWeight    ...    
                               obj.MaxIter              obj.MaxPatience     obj.WindowSize    obj.Verbose ...      
                               obj.InitMethod           obj.StdForInit      obj.Seed          obj.MeanInit ...      
-                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff...
-                              obj.HFuntion             obj.GradHFuntion    obj.ParamsDim     obj.Model ...
-                              obj.DataTrain            obj.Setting         obj.StepAdaptive  obj.NumFactor...
-                              obj.SaveParams           obj.Optimization};
+                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff ...
+                              obj.HFuntion             obj.NumParams       obj.DataTrain     obj.Setting ...
+                              obj.StepAdaptive         obj.NumFactor       obj.SaveParams    obj.Optimization};
 
-                [obj.NumSample,...
-                 obj.LearningRate,...
-                 obj.GradWeight,...
-                 obj.MaxIter,...
-                 obj.MaxPatience,...
-                 obj.WindowSize,...
-                 obj.Verbose,...
-                 obj.InitMethod,...
-                 obj.StdForInit,...
-                 obj.Seed,...
-                 obj.MeanInit,...
-                 obj.SigInitScale,...
-                 obj.LBPlot,...
-                 obj.GradientMax,...
-                 obj.AutoDiff,...
-                 obj.HFuntion,...
-                 obj.GradHFuntion,...
-                 obj.ParamsDim,...
-                 obj.Model,...
-                 obj.DataTrain,...
-                 obj.Setting,...
-                 obj.StepAdaptive,...
-                 obj.NumFactor,...
-                 obj.SaveParams,...
-                 obj.Optimization] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
+                [obj.NumSample, obj.LearningRate,obj.GradWeight,...
+                 obj.MaxIter, obj.MaxPatience, obj.WindowSize,obj.Verbose,...
+                 obj.InitMethod, obj.StdForInit, obj.Seed, obj.MeanInit,...
+                 obj.SigInitScale, obj.LBPlot, obj.GradientMax, obj.AutoDiff,...
+                 obj.HFuntion, obj.NumParams, obj.DataTrain, obj.Setting,...
+                 obj.StepAdaptive, obj.NumFactor, obj.SaveParams, obj.Optimization] ...
+                                        = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
            end 
            
-           % Set model name if model is specified
-           if (~isempty(obj.Model))
-               model = obj.Model;
-               obj.ModelToFit   = model.ModelName; 
-           else
-               if(~isempty(obj.DataTrain))
-                   data = obj.DataTrain;
-               else
-                   error('A training data must be specified!')
-               end
+           % Check if model object or function handle is provided
+           if (isobject(mdl)) % If model object is provided
+               obj.Model = mdl;
+               obj.ModelToFit = obj.Model.ModelName; % Set model name if model is specified
+           else % If function handle is provided
+               obj.GradHFuntion = mdl;
            end
            
            % Main function to run CGVB
-           obj.Post   = obj.fit(data);
+           obj.Post = obj.fit(data);
+           
         end
         
         %% VB main function
@@ -85,10 +62,10 @@ classdef VAFC < VBayesLab
             % Extract model object if provided
             if (~isempty(obj.Model))                   % If instance of a model is provided
                 model           = obj.Model;
-                d_theta         = model.ParamNum;      % Number of parameters
+                d_theta         = model.NumParams;      % Number of parameters
             else                                       %   
-                if (~isempty(obj.ParamsDim))
-                    d_theta = obj.ParamsDim;
+                if (~isempty(obj.NumParams))
+                    d_theta = obj.NumParams;
                 else
                     error('Number of model parameters have to be specified!')
                 end
@@ -111,43 +88,32 @@ classdef VAFC < VBayesLab
             grad_hfunc      = obj.GradHFuntion;
             setting         = obj.Setting;
             opt             = obj.Optimization;
+            verbose         = obj.Verbose;
+            save_params     = obj.SaveParams;   
+
+            % Store variational mean in each iteration (if specified)
+            if(save_params)
+                params_iter = zeros(max_iter,d_theta);
+            end  
             
             % Initialization
-            iter      = 1;              
-            patience  = 0;
-            stop      = false; 
-            LB_smooth = 0;
+            iter        = 0;              
+            patience    = 0;
+            stop        = false; 
+            LB_smooth   = 0;
+            lambda_best = [];
             
             % Initialization of mu
             % If initial parameters are not specified, then use some
             % initialization methods
             if isempty(ini_mu)
-                switch obj.InitMethod
-                    case 'MLE'
-                        mu = model.initParams('MLE',data);
-                        B = normrnd(0,std_init,d_theta,num_factor);
-                        c = init_scale*ones(d_theta,1);
-                    case 'Prior'
-                        mu = model.initParams('Prior',std_init);
-                        B = normrnd(0,std_init,d_theta,num_factor);
-                        c = init_scale*ones(d_theta,1);
-                    case 'Zeros'
-                        mu = zeros(d_theta,1) + std_init;
-                        B  = zeros(d_theta,num_factor) + std_init;
-                        c  = init_scale*ones(d_theta,1);
-                    case 'Random'
-                        mu = zeros(d_theta,1) + std_init;
-                        B  = normrnd(0,std_init,d_theta,num_factor);
-                        c  = init_scale*ones(d_theta,1);
-                    otherwise
-                        error(['There is no initialization method named ',obj.InitMethod,'!'])
-                end
+                mu = normrnd(0,std_init,d_theta,1);
             else % If initial parameters are provided
                 mu = ini_mu;
-                B = normrnd(0,std_init,d_theta,num_factor);
-                c = init_scale*ones(d_theta,1);
             end
-            
+            B = normrnd(0,std_init,d_theta,num_factor);
+            c = init_scale*ones(d_theta,1);  
+                
             %  Column vector variational parameters
             lambda = [mu;B(:);c]; 
             
@@ -231,6 +197,7 @@ classdef VAFC < VBayesLab
 
             %% Main VB loop
             while ~stop 
+                
                 iter = iter + 1;   
                 
                 % To compute log q_lambda
@@ -340,16 +307,31 @@ classdef VAFC < VBayesLab
                 end 
 
                 % Display training information
-                if(obj.Verbose)
+                if(verbose)
                     if iter> window_size
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB_smooth(iter-window_size))])
                     else
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB(iter))])
                     end
                 end
+                
+                % If users want to save variational mean in each iteration
+                % Only use when debuging code
+                if(save_params)
+                    params_iter(iter,:) = mu;
+                end
             end
             
             % Store output 
+            if(save_params)
+                Post.muIter = params_iter(1:iter-1,:);
+            end
+            
+            % If the algorithm stops too early
+            if(isempty(lambda_best))
+                lambda_best = lambda;
+            end
+            
             Post.LB_smooth = LB_smooth;
             Post.LB        = LB; 
             Post.lambda    = lambda_best;
@@ -382,7 +364,7 @@ classdef VAFC < VBayesLab
         end
         
         function prod = inv_fisher_grad_multifactor(obj,B,c,grad1,grad2,grad3)
-            %function prod = inverse_fisher_times_grad(b,c,grad)
+            % function prod = inverse_fisher_times_grad(b,c,grad)
             % compute the product inverse_fisher x grad
             % B: dxp matrix where p<<d
             [d,p] = size(B);
@@ -405,19 +387,6 @@ classdef VAFC < VBayesLab
             prod2 = I22\grad2;
             prod3 = I33\grad3;
             prod = [prod1;prod2;prod3];
-        end
-        
-        %% Plot lowerbound
-        % Call this after running VB 
-        function plot_lb(obj,lb)
-            plot(lb,'LineWidth',2)
-            if(~isempty(obj.Model))
-                title(['Lower bound ',obj.Method ,' - ',obj.Model.ModelName])
-            else
-                title('Lower bound')
-            end
-            xlabel('Iterations')
-            ylabel('Lower bound')
         end
     end
 end

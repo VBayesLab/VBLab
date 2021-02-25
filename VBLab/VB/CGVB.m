@@ -8,7 +8,7 @@ classdef CGVB < VBayesLab
     end
     
     methods
-        function obj = CGVB(data,varargin)
+        function obj = CGVB(mdl,data,varargin)
             %CGVB Construct an instance of this class
             %   Detailed explanation goes here
             obj.Method       = 'CGVB';
@@ -16,19 +16,19 @@ classdef CGVB < VBayesLab
             obj.GradWeight2  = 0.9;
             
             % Parse additional options
-            if nargin > 1
+            if nargin > 2
                 paramNames = {'NumSample'             'LearningRate'       'GradWeight1'     'GradWeight2' ...      
                               'MaxIter'               'MaxPatience'        'WindowSize'      'Verbose' ...        
                               'InitMethod'            'StdForInit'         'Seed'            'MeanInit' ...       
                               'SigInitScale'          'LBPlot'             'GradientMax'     'AutoDiff' ...       
-                              'HFuntion'              'GradHFuntion'       'ParamsDim'       'Model' ...
-                              'DataTrain'             'Setting'            'StepAdaptive'    'SaveParams'};
-                paramDflts = {obj.NumSample            obj.LearningRate    obj.GradWeight1   obj.GradWeight2 ...    
-                              obj.MaxIter              obj.MaxPatience     obj.WindowSize    obj.Verbose ...      
-                              obj.InitMethod           obj.StdForInit      obj.Seed          obj.MeanInit ...      
-                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff...
-                              obj.HFuntion             obj.GradHFuntion    obj.ParamsDim     obj.Model ...
-                              obj.DataTrain            obj.Setting         obj.StepAdaptive  obj.SaveParams};
+                              'HFuntion'              'NumParams'          'DataTrain'       'Setting' ...
+                              'StepAdaptive'          'SaveParams'};
+                paramDflts = {obj.NumSample           obj.LearningRate     obj.GradWeight1   obj.GradWeight2 ...    
+                              obj.MaxIter             obj.MaxPatience      obj.WindowSize    obj.Verbose ...      
+                              obj.InitMethod          obj.StdForInit       obj.Seed          obj.MeanInit ...      
+                              obj.SigInitScale        obj.LBPlot           obj.GradientMax   obj.AutoDiff ...
+                              obj.HFuntion            obj.NumParams        obj.DataTrain     obj.Setting  ...
+                              obj.StepAdaptive        obj.SaveParams};
 
                 [obj.NumSample,...
                  obj.LearningRate,...
@@ -47,23 +47,23 @@ classdef CGVB < VBayesLab
                  obj.GradientMax,...
                  obj.AutoDiff,...
                  obj.HFuntion,...
-                 obj.GradHFuntion,...
-                 obj.ParamsDim,...
-                 obj.Model,...
+                 obj.NumParams,...
                  obj.DataTrain,...
                  obj.Setting,...
                  obj.StepAdaptive,...
                  obj.SaveParams] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
            end 
            
-           % Set model name if model is specified
-           if (~isempty(obj.Model))
-               model = obj.Model;
-               obj.ModelToFit = model.ModelName; 
+           % Check if model object or function handle is provided
+           if (isobject(mdl)) % If model object is provided
+               obj.Model = mdl;
+               obj.ModelToFit = obj.Model.ModelName; % Set model name if model is specified
+           else % If function handle is provided
+               obj.GradHFuntion = mdl;
            end
-           
+                                
            % Main function to run CGVB
-           obj.Post   = obj.fit(data);  
+           obj.Post = obj.fit(data);  
         end
         
         %% VB main function 
@@ -72,10 +72,10 @@ classdef CGVB < VBayesLab
             % Extract model object if provided 
             if (~isempty(obj.Model))                  
                 model           = obj.Model;
-                d_theta         = model.ParamNum;      % Number of parameters
+                d_theta         = model.NumParams;      % Number of parameters
             else  % If model object is not provided, number of parameters must be provided  
-                if (~isempty(obj.ParamsDim))
-                    d_theta = obj.ParamsDim;
+                if (~isempty(obj.NumParams))
+                    d_theta = obj.NumParams;
                 else
                     error('Number of model parameters have to be specified!')
                 end
@@ -97,34 +97,35 @@ classdef CGVB < VBayesLab
             momentum_beta2  = obj.GradWeight2;
             grad_hfunc      = obj.GradHFuntion;
             setting         = obj.Setting;
+            verbose         = obj.Verbose;
+            save_params     = obj.SaveParams;
+            
+            % Store variational mean in each iteration (if specified)
+            if(save_params)
+                params_iter = zeros(max_iter,d_theta);
+            end  
             
             % Initialization
-            iter      = 1;              
-            patience  = 0;
-            stop      = false; 
-            LB_smooth = 0;
+            iter        = 0;              
+            patience    = 0;
+            stop        = false; 
+            LB_smooth   = 0;
+            lambda_best = [];
             
             % Number of variational parameters
             d_lambda = d_theta + d_theta*(d_theta+1)/2;
 
             % Initialization of mu
-            % If initial parameters are not specified, then use some
-            % initialization methods
+            % If initial parameters are not specified, then randomly
+            % initialize variational parameters
             if isempty(ini_mu)
-                switch obj.InitMethod
-                    case 'MLE'
-                        mu = model.initParams('MLE',data);
-                    case 'Prior'
-                        mu = model.initParams('Random',std_init);
-                    case 'Zeros'  % No need, only for testing
-                        mu = zeros(d_theta,1);
-                    case 'Random'
-                        mu = normrnd(0,std_init,d_theta,1);
-                    otherwise
-                        error(['There is no initialization method named ',obj.InitMethod,'!'])
-                end
+                mu = normrnd(0,std_init,d_theta,1);
             else % If initial parameters are provided
-                mu = ini_mu;
+                if (length(ini_mu) ~= d_theta)
+                    error(utils_errorMsg('vbayeslab:InitVectorMisMatched'))
+                else
+                    mu = reshape(ini_mu,d_theta,1); % Must be a colums vector
+                end
             end
             
             % Initialize variational parameters
@@ -186,12 +187,13 @@ classdef CGVB < VBayesLab
             v_adaptive     = g_adaptive.^2; 
             g_bar_adaptive = g_adaptive; 
             v_bar_adaptive = v_adaptive; 
-            
+                     
             % Run main VB iterations 
-            while ~stop    
-                iter     = iter+1;
-                mu       = lambda(1:d_theta);
-                L        = utils_vechinv(lambda(d_theta+1:end),2);
+            while ~stop                   
+                
+                iter = iter+1;
+                mu   = lambda(1:d_theta);
+                L    = utils_vechinv(lambda(d_theta+1:end),2);
 
                 grad_LB  = zeros(S,d_lambda);
                 h_lambda = zeros(S,1);
@@ -279,7 +281,7 @@ classdef CGVB < VBayesLab
                 end 
 
                 % Display training information
-                if(obj.Verbose)
+                if(verbose)
                     if iter> window_size
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB_smooth(iter-window_size))])
                     else
@@ -287,9 +289,24 @@ classdef CGVB < VBayesLab
                     end
                 end
                 
+                % If users want to save variational mean in each iteration
+                % Only use when debuging code
+                if(save_params)
+                    params_iter(iter,:) = mu;
+                end
             end
             
             % Store output 
+            if(save_params)
+                Post.muIter = params_iter(1:iter-1,:);
+            end
+
+            % If the algorithm stops too early
+            if(isempty(lambda_best))
+                lambda_best = lambda;
+            end
+            
+            % Store final results
             Post.LB_smooth = LB_smooth;
             Post.LB        = LB;
             Post.lambda    = lambda_best;
@@ -311,8 +328,7 @@ classdef CGVB < VBayesLab
             d          = length(theta);
             Sigma      = L*(L');
             log_q      = -d/2*log(2*pi)-1/2*log(det(Sigma))-1/2*(theta-mu)'*(Sigma\(theta-mu));
-            grad_log_q = -Sigma\(theta-mu);
-            
+            grad_log_q = -Sigma\(theta-mu);            
         end        
     end
 end

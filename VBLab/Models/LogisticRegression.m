@@ -4,7 +4,7 @@ classdef LogisticRegression
     % Attributes
     properties 
         ModelName      % Model name 
-        ParamNum       % Number of parameters
+        NumParams      % Number of parameters
         PriorInput     % Prior specified by users
         Prior          % Prior object
         PriorVal       % Parameters of priors  
@@ -23,7 +23,7 @@ classdef LogisticRegression
             obj.PriorInput = {'Normal',[0,1]};
             obj.Intercept  = true;
             obj.AutoDiff   = false;
-            obj.ParamNum   = n_features;
+            obj.NumParams  = n_features;
             obj.CutOff     = 0.5;
 
             % Get additional arguments (some arguments are only for testing)
@@ -48,16 +48,18 @@ classdef LogisticRegression
         
         %% Log likelihood
         % Input: 
+        %   - data: 2D array. The last column is the responses
         %   - params: Dx1 vector of parameters
         % Output: 
         %   - llh: Log likelihood of the model
-        function llh = logLik(obj,data,theta)
+        function llh = logLik(obj,data,params)
             
-            params = obj.toOriginalParams(theta);
+            % Make sure params is a columns
+            params = reshape(obj.toOriginalParams(params),obj.NumParams,1);
                         
             % Extract data
-            y = data.y;
-            X = data.X;
+            y = data(:,end);
+            X = data(:,1:end-1);
             
             % Compute log likelihood
             aux = X*params;
@@ -69,17 +71,18 @@ classdef LogisticRegression
 
         %% Compute gradient of Log likelihood
         % Input: 
+        %   - data: 2D array. The last column is the responses
         %   - params: Dx1 vector of parameters
         % Output: 
         %   - llh_grad: Log likelihood of the model
-        function [llh_grad,llh] = logLikGrad(obj,data,theta)
+        function [llh_grad,llh] = logLikGrad(obj,data,params)
             
             % Extract data
-            X = data.X;
-            y = data.y;
+            y = data(:,end);
+            X = data(:,1:end-1);
             
             % Convert theta (normal) to original distribution
-            params = obj.toOriginalParams(theta');
+            params = reshape(obj.toOriginalParams(params),obj.NumParams,1);
             
             % Check if auto-diff option is available
             if (obj.AutoDiff)
@@ -90,7 +93,7 @@ classdef LogisticRegression
                 llh      = extractdata(llh_auto_diff);
             else
                 % Compute gradient of log likelihood
-                aux       = X*params';            
+                aux       = X*params;            
                 ppi       = 1./(1+exp(-aux));
                 llh_grad  = X'*(y-ppi);
                 
@@ -102,6 +105,7 @@ classdef LogisticRegression
  
         %% Compute gradient of Log likelihood using AutoDiff
         % Input: 
+        %   - data: 2D array. The last column is the responses
         %   - params: 1xD vector of parameters
         % Output: 
         %   - llh_grad: Log likelihood of the model
@@ -118,9 +122,12 @@ classdef LogisticRegression
         % Output: 
         %   - llh: Log prior of model parameters       
         function log_prior = logPriors(obj,params)
-                      
+            
+            params = reshape(obj.toOriginalParams(params),obj.NumParams,1);
+            
             % Compute log prior
             log_prior = obj.Prior.logPdfFnc(params,obj.PriorVal);
+            
         end  
         
         %% Compute gradient of log prior of parameters
@@ -157,8 +164,12 @@ classdef LogisticRegression
         end
         
         %% Function to compute h_theta = log lik + log prior
-        function h_func = hFunction(obj,data,theta)
-            
+        % Input: 
+        %   - data: 2D array. The last column is the responses
+        %   - theta: Dx1 vector of parameters
+        % Output: 
+        %   - h_func: Log likelihood + log prior
+        function h_func = hFunction(obj,data,theta)            
             % Transform parameters from normal to original distribution
             params = obj.toOriginalParams(theta);  
             
@@ -170,6 +181,12 @@ classdef LogisticRegression
         end
         
         %% Function to compute gradient of h_theta = grad log lik + grad log prior
+        % Input: 
+        %   - data: 2D array. The last column is the responses
+        %   - theta: Dx1 vector of parameters
+        % Output: 
+        %   - h_func_grad: gradient (Log likelihood + log prior)
+        %   - h_func: Log likelihood + log prior
         function [h_func_grad, h_func] = hFunctionGrad(obj,data,theta)
             
             % Transform parameters from normal to original distribution
@@ -195,11 +212,13 @@ classdef LogisticRegression
         
         %% Initialize parameters
         function params = initParams(obj,type,varargin)
-            d_theta = obj.ParamNum;
+            d_theta = obj.NumParams;
             switch type
-                case 'MLE' % Data must be provided
-                    data   = varargin{1};
-                    params = glmfit(data.X,data.y,'binomial','constant','off'); % initialise mu
+                case 'MLE' % 2D array of must be provided
+                    data = varargin{1};
+                    X = data(:,1:end-1);
+                    y = data(:,end);
+                    params = glmfit(X,y,'binomial','constant','off'); % initialise mu
                 case 'Prior'
                     params = obj.Prior.rngFnc(obj.PriorVal,[d_theta,1]);    
                 case 'Random' % (only for testing)

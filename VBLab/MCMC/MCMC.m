@@ -28,7 +28,7 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
     end
     
     methods
-        function obj = MCMC(model,varargin)
+        function obj = MCMC(model,data,varargin)
             %MCMC Construct an instance of this class
             %   Detailed explanation goes here
             obj.Method        = 'MCMC';
@@ -42,6 +42,7 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             obj.Scale         = 1;
             obj.SaveAfter     = 0;
             obj.Verbose       = 100;
+            obj.ParamsInit    = [];
             
             if nargin > 2
                 %Parse additional options
@@ -71,11 +72,9 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             DateVector = datevec(date);
             [~, MonthString] = month(date);
             date_time = ['_',num2str(DateVector(3)),'_',MonthString,'_'];
-            obj.SaveFileName = ['Results_REC2_MCMC',date_time];
+            obj.SaveFileName = ['Results_MCMC',date_time];
             
             % Run MCMC
-            data       = model.Data;
-            model.Data = [];
             obj.Post   = obj.fit(data); 
             
         end
@@ -85,7 +84,7 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             
             % Extract sampling setting
             model        = obj.Model;
-            num_params   = model.ParamNum;
+            num_params   = model.NumParams;
             verbose      = obj.Verbose;
             numMCMC      = obj.NumMCMC;
             scale        = obj.Scale;
@@ -94,13 +93,23 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             N_corr       = obj.NumCovariance;
             saveAfter    = obj.SaveAfter;
             saveFileName = obj.SaveFileName;
-            thetasave    = zeros(numMCMC,num_params);
+            params_init  = obj.ParamsInit;
             
+            thetasave    = zeros(numMCMC,num_params);
+                         
             % Get initial values of parameters
-            params = model.initParams('Prior');
+            if ~isempty(params_init) % If a vector of initial values if provided
+                if (length(params_init) ~= num_params)
+                    error(utils_errorMsg('vbayeslab:InitVectorMisMatched'))
+                else
+                    params = params_init;
+                end
+            else
+                params = model.initParams('Prior');
+            end
             
             % Make sure params is a row vector
-            params = reshape(params, 1, length(params));
+            params = reshape(params,1,num_params);
             
             % For the first iteration
             log_prior = model.logPriors(params);

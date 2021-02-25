@@ -12,7 +12,7 @@ classdef VBayesLab
         MaxPatience        % Maximum number of patiences for early stopping
         WindowSize         % Smoothing window
         ParamsInit         % Initial values of model parameters
-        ParamsDim          % Number of model parameters
+        NumParams          % Number of model parameters
         Seed               % Random seed
         Post               % Struct to store estimation results
         Verbose            % Turn on of off printed message during sampling phase
@@ -36,20 +36,21 @@ classdef VBayesLab
         function obj = VBayesLab(varargin)
             %MODEL Construct an instance of this class
             %   Detailed explanation goes here
-            obj.WindowSize   = 30;
-            obj.NumSample    = 50;
+            obj.AutoDiff     = false;
+            obj.GradientMax  = 100; 
             obj.GradWeight   = 0.9;
+            obj.InitMethod   = 'Random';
+            obj.LBPlot       = true;
             obj.LearningRate = 0.001;
             obj.MaxIter      = 5000;
             obj.MaxPatience  = 20;
+            obj.NumSample    = 50;
             obj.StdForInit   = 0.01;
             obj.SigInitScale = 0.1;
             obj.StepAdaptive = obj.MaxIter/2;
-            obj.LBPlot       = true;
-            obj.GradientMax  = 100; 
-            obj.InitMethod   = 'Random';
+            obj.SaveParams   = false;
             obj.Verbose      = true;
-            obj.AutoDiff     = false;
+            obj.WindowSize   = 30;
         end
         
         %% Plot lowerbound

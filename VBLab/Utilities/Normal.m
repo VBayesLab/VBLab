@@ -57,13 +57,31 @@ classdef Normal < Distribution
         end
         
         %% Transform parameters to normal distribution
-        function params_normal = toNormalParams(params)
-            params_normal = params;
+        % input: 
+        %        x: Dx1 
+        function params_normal = toNormalParams(x)
+            params_normal = x;
         end
 
         %% Tranform normal parameters to original distribution
-        function params_ori = toOriginalParams(params)
-            params_ori = params;
+        % input: 
+        %        x: Dx1 
+        function params_ori = toOriginalParams(x)
+            params_ori = x;
+        end
+        
+        %% Plot density given distribution parameters
+        % input: 
+        %        x: Dx1 
+        function plotPdf(params,varargin)
+            
+            % Extract 
+            mu = params(1);
+            sigma2 = params(2);
+            
+            xx = mu-4*sqrt(sigma2):0.001:mu+4*sqrt(sigma2);
+            yy = normpdf(xx,mu,sqrt(sigma2));
+            plot(xx,yy,'LineWidth',2)
         end
     end
 end

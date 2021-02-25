@@ -3,7 +3,7 @@ function data_out = readData(dataName, varargin)
 % Initialize additional options
 Intercept = true;  
 Length = NaN;
-Normalized = false;
+Normalized = true;
 Index = '';
 Type = 'Matrix';
 RealizedMeasure = '';
@@ -49,7 +49,7 @@ switch dataName
         data = load('GermanCredit.mat');
         data_mat = data.data;
         if(Normalized)
-            data_mat = [zscore(data.X(:,1:15)),data.X(:,16:end)];
+            data_mat = [zscore(data_mat(:,1:15)),data_mat(:,16:end)];
         end
         
     % LabourForce data
@@ -57,7 +57,10 @@ switch dataName
         datatype = 'Cross-Sectional';
         data = load('LabourForce.mat');
         data_mat = data.data;
-        
+        if(Normalized)
+            norm_col = [3,4,5,6];
+            data_mat(:,norm_col) = (data_mat(:,norm_col)-mean(data_mat(:,norm_col)))./std(data_mat(:,norm_col));
+        end       
         
     % RealizedLibrary data
     case 'RealizedLibrary'
@@ -94,7 +97,6 @@ switch dataName
         end
 end
 
-
 %% Check additional options
 % If a column of 1 is added to the matrix X of cross-sectional data (default)
 if strcmp(datatype,'Cross-Sectional') && Intercept
@@ -106,6 +108,8 @@ if strcmp(datatype,'Cross-Sectional') && Intercept
         data_table.Properties.VariableNames = VarNames;
         data_out = data_table;
     end
+else
+    data_out = data_mat;
 end
 
 end

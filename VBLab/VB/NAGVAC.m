@@ -7,7 +7,7 @@ classdef NAGVAC < VBayesLab
     end
     
     methods
-        function obj = NAGVAC(data,varargin)
+        function obj = NAGVAC(mdl,data,varargin)
             %NAGVAC Construct an instance of this class
             %   Detailed explanation goes here
             obj.Method       = 'NAGVAC';
@@ -26,19 +26,19 @@ classdef NAGVAC < VBayesLab
             obj.SaveParams   = false;
  
             % Parse additional options
-            if nargin > 1
+            if nargin > 2
                 paramNames = {'NumSample'             'LearningRate'       'GradWeight'      'GradClipInit'...      
                               'MaxIter'               'MaxPatience'        'WindowSize'      'Verbose' ...        
                               'InitMethod'            'StdForInit'         'Seed'            'MeanInit' ...       
                               'SigInitScale'          'LBPlot'             'GradientMax'     'AutoDiff' ...       
-                              'HFuntion'              'GradHFuntion'       'ParamsDim'       'Model' ...
-                              'DataTrain'             'Setting'            'StepAdaptive'    'SaveParams'};
+                              'HFuntion'              'NumParams'          'DataTrain'       'Setting'...
+                              'StepAdaptive'          'SaveParams'};
                 paramDflts = {obj.NumSample            obj.LearningRate    obj.GradWeight    obj.GradClipInit ...    
                               obj.MaxIter              obj.MaxPatience     obj.WindowSize    obj.Verbose ...      
                               obj.InitMethod           obj.StdForInit      obj.Seed          obj.MeanInit ...      
-                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff...
-                              obj.HFuntion             obj.GradHFuntion    obj.ParamsDim     obj.Model ...
-                              obj.DataTrain            obj.Setting         obj.StepAdaptive  obj.SaveParams};
+                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff ...
+                              obj.HFuntion             obj.NumParams       obj.DataTrain     obj.Setting ...
+                              obj.StepAdaptive         obj.SaveParams};
 
                 [obj.NumSample,...
                  obj.LearningRate,...
@@ -57,29 +57,23 @@ classdef NAGVAC < VBayesLab
                  obj.GradientMax,...
                  obj.AutoDiff,...
                  obj.HFuntion,...
-                 obj.GradHFuntion,...
-                 obj.ParamsDim,...
-                 obj.Model,...
+                 obj.NumParams,...
                  obj.DataTrain,...
                  obj.Setting,...
                  obj.StepAdaptive,...
                  obj.SaveParams] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
            end        
            
-           % Set model name if model is specified
-           if (~isempty(obj.Model))
-               model = obj.Model;
-               obj.ModelToFit   = model.ModelName; 
-           else
-               if(~isempty(obj.DataTrain))
-                   data = obj.DataTrain;
-               else
-                   error('A training data must be specified!')
-               end
+           % Check if model object or function handle is provided
+           if (isobject(mdl)) % If model object is provided
+               obj.Model = mdl;
+               obj.ModelToFit = obj.Model.ModelName; % Set model name if model is specified
+           else % If function handle is provided
+               obj.GradHFuntion = mdl;
            end
            
            % Main function to run NAGVAC
-           obj.Post   = obj.fit(data);  
+           obj.Post = obj.fit(data);  
             
         end
         
@@ -89,10 +83,10 @@ classdef NAGVAC < VBayesLab
             % Extract model object if provided 
             if (~isempty(obj.Model))                  
                 model           = obj.Model;
-                d_theta         = model.ParamNum;      % Number of parameters
+                d_theta         = model.NumParams;      % Number of parameters
             else  % If model object is not provided, number of parameters must be provided  
-                if (~isempty(obj.ParamsDim))
-                    d_theta = obj.ParamsDim;
+                if (~isempty(obj.NumParams))
+                    d_theta = obj.NumParams;
                 else
                     error('Number of model parameters have to be specified!')
                 end
@@ -113,29 +107,26 @@ classdef NAGVAC < VBayesLab
             max_grad        = obj.GradientMax;
             grad_hfunc      = obj.GradHFuntion;
             setting         = obj.Setting;
+            verbose         = obj.Verbose;
+            save_params     = obj.SaveParams;
+ 
+            % Store variational mean in each iteration (if specified)
+            if(save_params)
+                params_iter = zeros(max_iter,d_theta);
+            end  
             
             % Initialization
-            iter      = 1;              
-            patience  = 0;
-            stop      = false; 
-            LB_smooth = 0;
+            iter        = 1;              
+            patience    = 0;
+            stop        = false; 
+            LB_smooth   = 0;
+            lambda_best = [];
             
             % Initialization of mu
             % If initial parameters are not specified, then use some
             % initialization methods
             if isempty(ini_mu)
-                switch obj.InitMethod
-                    case 'MLE'
-                        mu = model.initParams('MLE',data);
-                    case 'Prior'
-                        mu = model.initParams('Random',std_init);
-                    case 'Zeros'  % No need, only for testing
-                        mu = zeros(d_theta,1);
-                    case 'Random'
-                        mu = normrnd(0,std_init,d_theta,1);
-                    otherwise
-                        error(['There is no initialization method named ',obj.InitMethod,'!'])
-                end
+                mu = normrnd(0,std_init,d_theta,1);
             else % If initial parameters are provided
                 mu = ini_mu;
             end
@@ -145,7 +136,6 @@ classdef NAGVAC < VBayesLab
             
             lambda             = [mu;b;c];            % Variational parameters vector
             lambda_seq(iter,:) = lambda';
-            lambda_best        = lambda; 
 
             % Store all setting to a structure
             param(iter,:) = mu';
@@ -202,9 +192,16 @@ classdef NAGVAC < VBayesLab
             gradient_bar    = gradient_lambda;
 
             %% Main VB loop
-            while ~stop 
+            while ~stop
+                
+                % If users want to save variational mean in each iteration
+                % Only use when debuging code
+                if(save_params)
+                    params_iter(iter,:) = mu;
+                end
+                
                 iter = iter + 1;
-                rqmc          = normrnd(0,1,S,d_theta+1); 
+                rqmc = normrnd(0,1,S,d_theta+1); 
                 grad_lb_iter  = zeros(S,3*d_theta); % store gradient of lb over S MC simulations
                 lb_first_term = zeros(S,1); % to estimate the first term in lb = E_q(log f)-E_q(log q)
                 for s=1:S
@@ -290,13 +287,24 @@ classdef NAGVAC < VBayesLab
                 end
 
                 % Display training information
-                if(obj.Verbose)
+                if(verbose)
                     if iter> window_size
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB_smooth(iter-window_size))])
                     else
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB(iter))])
                     end
                 end
+               
+            end
+            
+            % Store output 
+            if(save_params)
+                Post.muIter = params_iter(1:iter-1,:);
+            end
+
+            % If the algorithm stops too early
+            if(isempty(lambda_best))
+                lambda_best = lambda;
             end
             
             % Store final results

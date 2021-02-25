@@ -7,27 +7,27 @@ classdef MGVB < VBayesLab
     end
     
     methods
-        function obj = MGVB(data,varargin)
+        function obj = MGVB(mdl,data,varargin)
             %MVB Construct an instance of this class
             %   Detailed explanation goes here
             obj.Method        = 'MGVB';
-            obj.GradWeight    = 0.4;
-            obj.GradClipInit  = 0;
+            obj.GradWeight    = 0.4;    % Small gradient weight is better
+            obj.GradClipInit  = 0;      % Sometimes we need to clip the gradient early
             
             % Parse additional options
-            if nargin > 1
+            if nargin > 2
                 paramNames = {'NumSample'             'LearningRate'       'GradWeight'      'GradClipInit' ...      
                               'MaxIter'               'MaxPatience'        'WindowSize'      'Verbose' ...        
                               'InitMethod'            'StdForInit'         'Seed'            'MeanInit' ...       
-                              'SigInitScale'          'LBPlot'             'GradientMax'     'AutoDiff' ...       
-                              'HFuntion'              'GradHFuntion'       'ParamsDim'       'Model' ...
-                              'DataTrain'             'Setting'            'StepAdaptive'    'SaveParams'};
+                              'SigInitScale'          'LBPlot'             'GradientMax' ...
+                              'NumParams'             'DataTrain'          'Setting'         'StepAdaptive' ...
+                              'SaveParams'};
                 paramDflts = {obj.NumSample            obj.LearningRate    obj.GradWeight    obj.GradClipInit ...    
                               obj.MaxIter              obj.MaxPatience     obj.WindowSize    obj.Verbose ...      
                               obj.InitMethod           obj.StdForInit      obj.Seed          obj.MeanInit ...      
-                              obj.SigInitScale         obj.LBPlot          obj.GradientMax   obj.AutoDiff...
-                              obj.HFuntion             obj.GradHFuntion    obj.ParamsDim     obj.Model ...
-                              obj.DataTrain            obj.Setting         obj.StepAdaptive  obj.SaveParams};
+                              obj.SigInitScale         obj.LBPlot          obj.GradientMax  ...
+                              obj.NumParams            obj.DataTrain       obj.Setting       obj.StepAdaptive ...
+                              obj.SaveParams};
 
                 [obj.NumSample,...
                  obj.LearningRate,...
@@ -44,27 +44,19 @@ classdef MGVB < VBayesLab
                  obj.SigInitScale,...
                  obj.LBPlot,...
                  obj.GradientMax,...
-                 obj.AutoDiff,...
-                 obj.HFuntion,...
-                 obj.GradHFuntion,...
-                 obj.ParamsDim,...
-                 obj.Model,...
+                 obj.NumParams,...
                  obj.DataTrain,...
                  obj.Setting,...
                  obj.StepAdaptive,...
                  obj.SaveParams] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
            end 
            
-           % Set model name if model is specified
-           if (~isempty(obj.Model))
-               model = obj.Model;
-               obj.ModelToFit   = model.ModelName; 
-           else
-               if(~isempty(obj.DataTrain))
-                   data = obj.DataTrain;
-               else
-                   error('A training data must be specified!')
-               end
+           % Check if model object or function handle is provided
+           if (isobject(mdl)) % If model object is provided
+               obj.Model = mdl;
+               obj.ModelToFit = obj.Model.ModelName; % Set model name if model is specified
+           else % If function handle is provided
+               obj.HFuntion = mdl;
            end
            
            % Main function to run MGVB
@@ -77,10 +69,10 @@ classdef MGVB < VBayesLab
             % Extract model object if provided 
             if (~isempty(obj.Model))                  
                 model           = obj.Model;
-                d_theta         = model.ParamNum;      % Number of parameters
+                d_theta         = model.NumParams;      % Number of parameters
             else  % If model object is not provided, number of parameters must be provided  
-                if (~isempty(obj.ParamsDim))
-                    d_theta = obj.ParamsDim;
+                if (~isempty(obj.NumParams))
+                    d_theta = obj.NumParams;
                 else
                     error('Number of model parameters have to be specified!')
                 end
@@ -102,9 +94,16 @@ classdef MGVB < VBayesLab
             max_grad_init   = obj.GradClipInit;
             hfunc           = obj.HFuntion;
             setting         = obj.Setting;
+            verbose         = obj.Verbose;
+            save_params     = obj.SaveParams;     
+
+            % Store variational mean in each iteration (if specified)
+            if(save_params)
+                params_iter = zeros(max_iter,d_theta);
+            end  
             
             % Initialization
-            iter      = 1;              
+            iter      = 0;              
             patience  = 0;
             stop      = false; 
             LB_smooth = 0;
@@ -113,18 +112,7 @@ classdef MGVB < VBayesLab
             % If initial parameters are not specified, then use some
             % initialization methods
             if isempty(ini_mu)
-                switch obj.InitMethod
-                    case 'MLE'
-                        mu = model.initParams('MLE',data);
-                    case 'Prior'
-                        mu = model.initParams('Random',std_init);
-                    case 'Zeros'  % No need, only for testing
-                        mu = zeros(d_theta,1);
-                    case 'Random'
-                        mu = normrnd(0,std_init,d_theta,1);
-                    otherwise
-                        error(['There is no initialization method named ',obj.InitMethod,'!'])
-                end
+                mu = normrnd(0,std_init,d_theta,1);
             else % If initial parameters are provided
                 mu = ini_mu;
             end
@@ -200,7 +188,8 @@ classdef MGVB < VBayesLab
             % Prepare for the next iterations
             mu_best   = mu; 
             Sig_best  = Sig; 
-            while ~stop    
+            while ~stop   
+                
                 iter = iter+1;    
                 if iter>stepsize_adapt
                     stepsize = eps0*stepsize_adapt/iter;
@@ -279,17 +268,16 @@ classdef MGVB < VBayesLab
                 % Lower bound
                 LB(iter) = mean(lb_log_h);
                 
-                % Smooth the lowerbound
-                if iter>=window_size
-                    LB_smooth(iter-window_size+1) = mean(LB(iter-window_size+1:iter));
-                end
-
-                % Check for early stopping
-                if (iter>window_size)&&(LB_smooth(iter-window_size+1)>=max(LB_smooth))
-                    lambda_best = lambda;
-                    patience = 0;
-                else
-                    patience = patience+1;
+                % Smooth the lowerbound and store best results 
+                if iter>window_size
+                    LB_smooth(iter-window_size) = mean(LB(iter-window_size:iter));    % smooth out LB by moving average
+                    if LB_smooth(iter-window_size)>=max(LB_smooth)
+                        mu_best  = mu; 
+                        Sig_best = Sig;
+                        patience = 0;
+                    else
+                        patience = patience + 1;
+                    end
                 end
 
                 if (patience>max_patience)||(iter>max_iter) 
@@ -297,14 +285,25 @@ classdef MGVB < VBayesLab
                 end   
                 
                 % Display training information
-                if(obj.Verbose)
+                if(verbose)
                     if iter> window_size
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB_smooth(iter-window_size))])
                     else
                         disp(['Iter: ',num2str(iter),'| LB: ',num2str(LB(iter))])
                     end
                 end
-
+                
+                % If users want to save variational mean in each iteration
+                % Only use when debuging code
+                if(save_params)
+                    params_iter(iter,:) = mu;
+                end
+                
+            end
+ 
+            % Store output 
+            if(save_params)
+                Post.muIter = params_iter(1:iter-1,:);
             end
             
             % Store output
