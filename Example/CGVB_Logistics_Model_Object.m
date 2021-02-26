@@ -57,18 +57,20 @@ grid on
 plot(Estmdl_1.Post.LB_smooth,'-r','LineWidth',2)
 plot(Estmdl_2.Post.LB_smooth,'--b','LineWidth',2)
 title('Lowerbound')
+xlabel('Iterations')
 legend('Random Initialization','MLE Initialization' )
 
 %% It is useful to compare the approximate posterior density to the true density obtain by MCMC
 Post_MCMC = MCMC(Mdl,labour,...
-                 'NumMCMC',50000,...
-                 'ParamsInit',theta_init,...
-                 'Verbose',1);
+                 'NumMCMC',100000,...        % Number of MCMC iterations
+                 'ParamsInit',theta_init,... % Using MLE estimates as initial values
+                 'Verbose',100);             % Display sampling information after each 100 iterations
              
 %% Compare densities by CGVB and MCMC
 % Get posterior mean and trace plot for a parameter to check the mixing 
-[mcmc_mean,mcmc_std,mcmc_chain] = Post_MCMC.getParamsMean('BurnInRate',0.4,...
-                                                          'PlotTrace',1);
+[mcmc_mean,mcmc_std,mcmc_chain] = Post_MCMC.getParamsMean('BurnInRate',0.2,...         % Throw away 20% samples
+                                                          'PlotTrace',1:n_features,... % Plot the first parameter
+                                                          'SubPlot',[2,4]);    
 
 % Plot density
 fontsize  = 20;
@@ -82,7 +84,7 @@ figure
 for i = 1:numparams
     subplot(3,3,i)
     xx = mcmc_mean(i)-4*mcmc_std(i):0.002:mcmc_mean(i)+4*mcmc_std(i);
-    yy_mcmc = ksdensity(mcmc_chain(:,i),xx);    
+    yy_mcmc = ksdensity(mcmc_chain(:,i),xx,'Bandwidth',0.022);    
     yy_vb = normpdf(xx,mu_vb(i),sqrt(sigma2_vb(i)));    
     plot(xx,yy_mcmc,'-k',xx,yy_vb,'--b','LineWidth',1.5)
     line([theta_init(i) theta_init(i)],ylim,'LineWidth',1.5,'Color','r')    
