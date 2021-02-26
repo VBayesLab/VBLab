@@ -69,8 +69,8 @@ Post_MCMC = MCMC(Mdl,labour,...
 %% Compare densities by CGVB and MCMC
 % Get posterior mean and trace plot for a parameter to check the mixing 
 [mcmc_mean,mcmc_std,mcmc_chain] = Post_MCMC.getParamsMean('BurnInRate',0.2,...         % Throw away 20% samples
-                                                          'PlotTrace',1:n_features,... % Plot the first parameter
-                                                          'SubPlot',[2,4]);    
+                                                          'PlotTrace',1:n_features,... % Trace plot for all parameters
+                                                          'SubPlot',[2,4]);            % Dimension of subplots
 
 % Plot density
 fontsize  = 20;
