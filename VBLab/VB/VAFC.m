@@ -97,7 +97,7 @@ classdef VAFC < VBayesLab
             end  
             
             % Initialization
-            iter        = 0;              
+            iter        = 1;              
             patience    = 0;
             stop        = false; 
             LB_smooth   = 0;
