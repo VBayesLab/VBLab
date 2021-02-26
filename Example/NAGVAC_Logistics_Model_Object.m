@@ -21,13 +21,13 @@ Mdl = LogisticRegression(n_features,...
                           
 %% Run Cholesky GVB with random initialization
 Post_NAGVAC = NAGVAC(Mdl,labour,...
-                  'NumSample',200,...       % Number of samples to estimate gradient of lowerbound
-                  'LearningRate',0.005,...  % Learning rate
-                  'MaxPatience',20,...      % For Early stopping
-                  'MaxIter',10000,...       % Maximum number of iterations
-                  'GradientMax',200,...     % For gradient clipping    
-                  'WindowSize',50, ...      % Smoothing window for lowerbound
-                  'LBPlot',true);           % Dont plot the lowerbound when finish
+                    'NumSample',200,...       % Number of samples to estimate gradient of lowerbound
+                    'LearningRate',0.005,...  % Learning rate
+                    'MaxPatience',20,...      % For Early stopping
+                    'MaxIter',10000,...       % Maximum number of iterations
+                    'GradientMax',200,...     % For gradient clipping    
+                    'WindowSize',50, ...      % Smoothing window for lowerbound
+                    'LBPlot',true);           % Dont plot the lowerbound when finish
              
 %% Plot variational distributions and lowerbound 
 figure
