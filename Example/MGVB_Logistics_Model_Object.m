@@ -1,4 +1,4 @@
-% Script to fot the Logistic Regression modell using the MGVB method 
+% Script to fit the Logistic Regression modell using the MGVB method 
 
 clear  % Clear all variables 
 clc % Clean workspace
