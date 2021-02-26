@@ -17,7 +17,7 @@ n_features = size(labour,2)-1;
 
 % Create a Logistic Regression model object
 Mdl = LogisticRegression(n_features,...
-					    'Prior',{'Normal',[0,50]});
+                        'Prior',{'Normal',[0,50]});
                           
 %% Run NAGVAC with random initialization
 Post_NAGVAC = NAGVAC(Mdl,labour,...
