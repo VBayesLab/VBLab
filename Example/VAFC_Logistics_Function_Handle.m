@@ -23,7 +23,7 @@ X = credit(:,1:end-1);
 y = credit(:,end);
 
 % Run CGVB
-Post_CGVB_manual = VAFC(@grad_h_func_logistic,credit,...
+Post_VAFC_manual = VAFC(@grad_h_func_logistic,credit,...
                         'NumParams',n_features,...
                         'Setting',setting,...
                         'NumFactor',4, ...       % Number of factors of the loading matrix
@@ -34,6 +34,28 @@ Post_CGVB_manual = VAFC(@grad_h_func_logistic,credit,...
                         'GradientMax',200,...    % For gradient clipping    
                         'WindowSize',20, ...     % Smoothing window for lowerbound
                         'LBPlot',true);          % Dont plot the lowerbound when finish
+
+%% Plot variational distributions and lowerbound 
+figure
+% Extract variation mean and variance
+mu_vb     = Post_VAFC_manual.Post.mu;
+sigma2_vb = Post_VAFC_manual.Post.sigma2;
+
+% Plot the variational distribution for the first 8 parameters
+for i=1:8
+    subplot(3,3,i)
+    vbayesPlot('Density',{'Normal',[mu_vb(i),sigma2_vb(i)]})
+    grid on
+    title(['\theta_',num2str(i)])
+    set(gca,'FontSize',15)
+end
+
+% Plot the smoothed lower bound
+subplot(3,3,9)
+plot(Post_VAFC_manual.Post.LB_smooth,'LineWidth',2)
+grid on
+title('Lower bound')
+set(gca,'FontSize',15)
 
 %% Define gradient of h function for Logistic regression 
 % theta: Dx1 array

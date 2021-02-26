@@ -37,6 +37,28 @@ Post_CGVB_manual = CGVB(@grad_h_func_logistic,labour,...
                         'WindowSize',10,...        % Smoothing window for lowerbound
                         'GradientMax',10,...       % For gradient clipping
                         'LBPlot',true); 
+                    
+%% Plot variational distributions and lowerbound 
+figure
+% Extract variation mean and variance
+mu_vb     = Post_CGVB_manual.Post.mu;
+sigma2_vb = Post_CGVB_manual.Post.sigma2;
+
+% Plot the variational distribution for the first 8 parameters
+for i=1:8
+    subplot(3,3,i)
+    vbayesPlot('Density',{'Normal',[mu_vb(i),sigma2_vb(i)]})
+    grid on
+    title(['\theta_',num2str(i)])
+    set(gca,'FontSize',15)
+end
+
+% Plot the smoothed lower bound
+subplot(3,3,9)
+plot(Post_CGVB_manual.Post.LB_smooth,'LineWidth',2)
+grid on
+title('Lower bound')
+set(gca,'FontSize',15)
 
 %% Define gradient of h function for Logistic regression 
 % theta: Dx1 array
