@@ -19,7 +19,7 @@ n_features = size(labour,2)-1;
 Mdl = LogisticRegression(n_features,...
 					    'Prior',{'Normal',[0,50]});
                           
-%% Run Cholesky GVB with random initialization
+%% Run NAGVAC with random initialization
 Post_NAGVAC = NAGVAC(Mdl,labour,...
                     'NumSample',200,...       % Number of samples to estimate gradient of lowerbound
                     'LearningRate',0.005,...  % Learning rate
