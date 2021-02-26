@@ -178,15 +178,17 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             post = obj.Post;
             burnin = [];
             burninrate = [];
-            PlotTrace = [];
+            PlotTrace = [];   % Array of indexes of model parameters
+            subplotsize = [];
             if nargin > 0
                 %Parse additional options
-                paramNames = {'BurnIn'          'BurnInRate'  'PlotTrace'};
-                paramDflts = {burnin            burninrate     PlotTrace};
+                paramNames = {'BurnIn'          'BurnInRate'  'PlotTrace'   'SubPlot'};
+                paramDflts = {burnin             burninrate    PlotTrace    subplotsize};
 
                 [burnin,...
                  burninrate,...
-                 PlotTrace] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
+                 PlotTrace,...
+                 subplotsize] = internal.stats.parseArgs(paramNames, paramDflts, varargin{:});                
             end
             
             if(isempty(burnin))
@@ -204,9 +206,16 @@ classdef MCMC < handle & matlab.mixin.CustomDisplay
             params      = post.theta(burnin+1:end,:);
             % If user wants to plot trace of the first parameter to check
             % the mixing
-            if (~isempty(PlotTrace))
+            if (~isempty(PlotTrace) && ~isempty(subplotsize))
+                nrow = subplotsize(1);
+                ncol = subplotsize(2);
+                
                 figure
-                plot(post.theta(burnin+1:end,PlotTrace))
+                for i=1:length(PlotTrace)
+                    subplot(nrow,ncol,i)
+                    plot(post.theta(burnin+1:end,PlotTrace(i)))
+                    title(['\theta_',num2str(i)],'FontSize', 20)
+                end
             end
         end
     end
