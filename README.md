@@ -23,13 +23,13 @@ The official documentation is avaiable at https://vbayeslab.github.io/VBLabDocs/
 
 - **Trong-Nghia Nguyen**, PhD candidate, The University of Sydney Business School. ([Google scholar](https://scholar.google.com.vn/citations?user=4fEGoI8AAAAJ&hl=en), [Research gate](https://www.researchgate.net/profile/Nghia_Nguyen79), [LinkedIn](https://www.linkedin.com/in/nguyen-nghia-458b3097/))
 - **Minh-Ngoc Tran**, Associate Professor, The University of Sydney Business School. ([Google scholar](https://scholar.google.com/citations?user=98A6Dq8AAAAJ&hl=en), [Research gate](https://www.researchgate.net/profile/Minh-Ngoc-Tran), [Home Page](https://sites.google.com/site/mntran26/home))
-- **Viet-Hung Dao**, PhD Candidate, The University of New South Wales Business School. ([Home Page](https://acems.org.au/our-people/hung-dao))
+- **Viet-Hung Dao**, PhD candidate, The University of New South Wales Business School. ([Home Page](https://acems.org.au/our-people/hung-dao))
 
 --- 
 
 ## Citing VBLab
 
-If you use VBLab in a scientific publication, we would appreciate citations to the following paper:
+If you use VBLab in a publication, we would appreciate your citation to the following paper:
 
 M.-N. Tran, T.-N. Nguyen and V.-H. Dao (2021). [A practical tutorial on Variational Bayes](https://www.researchgate.net/publication/340006729_A_practical_tutorial_on_Variational_Bayes). *Technical Report*.
 
